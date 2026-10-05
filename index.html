@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Job Quote Calculator | Work Out What To Charge</title>
+<title>Job Quote Calculator</title>
 
 <style>
 * {
@@ -19,7 +19,7 @@ body {
 }
 
 .container {
-    max-width: 520px;
+    max-width: 550px;
     margin: 30px auto;
     padding: 20px;
 }
@@ -32,21 +32,19 @@ body {
 }
 
 h1 {
-    margin: 0 0 10px;
-    font-size: 30px;
     text-align: center;
+    margin-bottom: 10px;
 }
 
 .subtitle {
     text-align: center;
     color: #667085;
     margin-bottom: 25px;
-    line-height: 1.5;
 }
 
 label {
     display: block;
-    margin-top: 17px;
+    margin-top: 16px;
     margin-bottom: 6px;
     font-weight: bold;
 }
@@ -54,51 +52,28 @@ label {
 input {
     width: 100%;
     padding: 13px;
-    border: 1px solid #d0d5dd;
+    border: 1px solid #ccc;
     border-radius: 8px;
     font-size: 16px;
 }
 
 button {
     width: 100%;
-    margin-top: 25px;
+    margin-top: 22px;
     padding: 15px;
+    border: 0;
+    border-radius: 8px;
     background: #111827;
     color: white;
-    border: none;
-    border-radius: 8px;
     font-size: 17px;
     font-weight: bold;
-    cursor: pointer;
-}
-
-button:hover {
-    opacity: 0.9;
 }
 
 .result {
     display: none;
     margin-top: 25px;
-    padding: 22px;
+    padding: 20px;
     border-radius: 12px;
-    text-align: center;
-}
-
-.result h2 {
-    margin-top: 0;
-}
-
-.big-number {
-    font-size: 34px;
-    font-weight: bold;
-    margin: 10px 0;
-}
-
-.detail {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 
 .good {
@@ -113,12 +88,45 @@ button:hover {
     background: #ffe5e5;
 }
 
-.note {
-    margin-top: 18px;
-    font-size: 13px;
-    color: #667085;
+.big {
+    font-size: 32px;
+    font-weight: bold;
     text-align: center;
-    line-height: 1.5;
+}
+
+.quote-button {
+    background: #2563eb;
+}
+
+.quote {
+    display: none;
+    margin-top: 25px;
+    padding: 25px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+}
+
+.quote h2 {
+    margin-top: 0;
+}
+
+.quote-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+.total {
+    border-top: 2px solid #222;
+    margin-top: 10px;
+    padding-top: 12px;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.copy-button {
+    background: #16a34a;
 }
 </style>
 </head>
@@ -132,41 +140,40 @@ button:hover {
 <h1>What Should I Charge?</h1>
 
 <p class="subtitle">
-Work out your minimum quote and see what you'll really earn from a job.
+Work out your quote and create a professional customer quote.
 </p>
 
 <label>Job price (£)</label>
-<input type="number" id="price" placeholder="e.g. 500">
+<input id="price" type="number" placeholder="e.g. 500">
 
 <label>Hours working</label>
-<input type="number" id="hours" placeholder="e.g. 6">
+<input id="hours" type="number" placeholder="e.g. 6">
 
 <label>Travel time (hours)</label>
-<input type="number" id="travelTime" placeholder="e.g. 1">
+<input id="travelTime" type="number" placeholder="e.g. 1">
 
 <label>Materials (£)</label>
-<input type="number" id="materials" placeholder="e.g. 120">
+<input id="materials" type="number" placeholder="e.g. 120">
 
-<label>Travel / fuel costs (£)</label>
-<input type="number" id="travelCost" placeholder="e.g. 30">
+<label>Travel / fuel (£)</label>
+<input id="travelCost" type="number" placeholder="e.g. 30">
 
 <label>Your target hourly rate (£)</label>
-<input type="number" id="targetRate" placeholder="e.g. 40">
+<input id="targetRate" type="number" placeholder="e.g. 40">
 
-<button onclick="calculate()">Calculate My Quote</button>
+<button onclick="calculate()">Calculate</button>
 
 <div id="result" class="result"></div>
 
-<p class="note">
-This is a simple estimate and doesn't account for tax, VAT,
-insurance or other business overheads.
-</p>
+<div id="quote" class="quote"></div>
 
 </div>
 
 </div>
 
 <script>
+
+let jobData = {};
 
 function calculate() {
 
@@ -183,29 +190,27 @@ function calculate() {
     }
 
     const totalTime = hours + travelTime;
-
     const costs = materials + travelCost;
-
     const profit = price - costs;
-
-    const actualHourlyRate = profit / totalTime;
-
-    /*
-       Work backwards to calculate the minimum quote.
-
-       Target earnings =
-       target hourly rate × total time
-
-       Then add the costs.
-    */
+    const hourlyRate = profit / totalTime;
 
     const minimumQuote = (targetRate * totalTime) + costs;
-
-    /*
-       Add a small buffer to protect against unexpected costs/time.
-    */
-
     const recommendedQuote = minimumQuote * 1.10;
+
+    jobData = {
+        price,
+        hours,
+        travelTime,
+        materials,
+        travelCost,
+        targetRate,
+        totalTime,
+        costs,
+        profit,
+        hourlyRate,
+        minimumQuote,
+        recommendedQuote
+    };
 
     const result = document.getElementById("result");
 
@@ -214,18 +219,13 @@ function calculate() {
     let status;
     let className;
 
-    if (actualHourlyRate >= targetRate) {
-
+    if (hourlyRate >= targetRate) {
         status = "🟢 GOOD JOB";
         className = "good";
-
-    } else if (actualHourlyRate >= targetRate * 0.75) {
-
+    } else if (hourlyRate >= targetRate * 0.75) {
         status = "🟠 CONSIDER NEGOTIATING";
         className = "warning";
-
     } else {
-
         status = "🔴 TOO LOW";
         className = "bad";
     }
@@ -233,42 +233,92 @@ function calculate() {
     result.className = "result " + className;
 
     result.innerHTML = `
-
         <h2>${status}</h2>
 
         <p>Recommended quote</p>
 
-        <div class="big-number">
+        <div class="big">
             £${recommendedQuote.toFixed(2)}
         </div>
 
-        <div class="detail">
-            <span>Minimum quote</span>
-            <strong>£${minimumQuote.toFixed(2)}</strong>
-        </div>
-
-        <div class="detail">
-            <span>Your current quote</span>
-            <strong>£${price.toFixed(2)}</strong>
-        </div>
-
-        <div class="detail">
-            <span>Estimated hourly rate</span>
-            <strong>£${actualHourlyRate.toFixed(2)}</strong>
-        </div>
-
-        <div class="detail">
-            <span>Total time</span>
-            <strong>${totalTime.toFixed(1)} hours</strong>
-        </div>
-
-        <p style="margin-top:18px;">
-            Based on your target rate and the costs you entered,
-            you should aim for around
-            <strong>£${recommendedQuote.toFixed(2)}</strong>
-            for this job.
+        <p>
+            Your estimated hourly rate:
+            <strong>£${hourlyRate.toFixed(2)}</strong>
         </p>
+
+        <button class="quote-button" onclick="createQuote()">
+            Create Customer Quote
+        </button>
     `;
+
+    document.getElementById("quote").style.display = "none";
+}
+
+function createQuote() {
+
+    const d = jobData;
+
+    const quote = document.getElementById("quote");
+
+    quote.style.display = "block";
+
+    quote.innerHTML = `
+
+        <h2>JOB QUOTE</h2>
+
+        <p>Thank you for the opportunity to provide a quote for this work.</p>
+
+        <div class="quote-line">
+            <span>Labour</span>
+            <strong>£${(d.targetRate * d.hours).toFixed(2)}</strong>
+        </div>
+
+        <div class="quote-line">
+            <span>Materials</span>
+            <strong>£${d.materials.toFixed(2)}</strong>
+        </div>
+
+        <div class="quote-line">
+            <span>Travel</span>
+            <strong>£${d.travelCost.toFixed(2)}</strong>
+        </div>
+
+        <div class="quote-line total">
+            <span>Total</span>
+            <strong>£${d.minimumQuote.toFixed(2)}</strong>
+        </div>
+
+        <p style="margin-top:20px;">
+            Please let me know if you have any questions about this quote.
+        </p>
+
+        <button class="copy-button" onclick="copyQuote()">
+            Copy Quote
+        </button>
+    `;
+}
+
+function copyQuote() {
+
+    const text = `
+
+JOB QUOTE
+
+Thank you for the opportunity to provide a quote for this work.
+
+Labour: £${(jobData.targetRate * jobData.hours).toFixed(2)}
+Materials: £${jobData.materials.toFixed(2)}
+Travel: £${jobData.travelCost.toFixed(2)}
+
+TOTAL: £${jobData.minimumQuote.toFixed(2)}
+
+Please let me know if you have any questions about this quote.
+
+`;
+
+    navigator.clipboard.writeText(text);
+
+    alert("Quote copied! You can now paste it into a message or email.");
 }
 
 </script>

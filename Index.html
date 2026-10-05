@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Should I Take This Job?</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f4f4f4;
+        margin: 0;
+        padding: 20px;
+    }
+
+    .container {
+        max-width: 500px;
+        margin: 30px auto;
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+        margin-top: 0;
+        text-align: center;
+    }
+
+    p {
+        color: #555;
+        text-align: center;
+    }
+
+    label {
+        display: block;
+        margin-top: 15px;
+        font-weight: bold;
+    }
+
+    input {
+        width: 100%;
+        padding: 12px;
+        margin-top: 6px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 7px;
+        font-size: 16px;
+    }
+
+    button {
+        width: 100%;
+        margin-top: 25px;
+        padding: 14px;
+        border: none;
+        border-radius: 7px;
+        background: #111;
+        color: white;
+        font-size: 17px;
+        cursor: pointer;
+    }
+
+    #result {
+        margin-top: 25px;
+        padding: 18px;
+        border-radius: 8px;
+        text-align: center;
+        display: none;
+    }
+
+    .take {
+        background: #dff5e3;
+    }
+
+    .negotiate {
+        background: #fff1cc;
+    }
+
+    .walk {
+        background: #ffdede;
+    }
+
+    .rate {
+        font-size: 28px;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Should I Take This Job?</h1>
+
+    <p>
+        Find out what you're really earning per hour.
+    </p>
+
+    <label>Job price (£)</label>
+    <input type="number" id="price" placeholder="e.g. 500">
+
+    <label>Hours on the job</label>
+    <input type="number" id="hours" placeholder="e.g. 6">
+
+    <label>Travel time (hours)</label>
+    <input type="number" id="travelTime" placeholder="e.g. 1">
+
+    <label>Materials (£)</label>
+    <input type="number" id="materials" placeholder="e.g. 120">
+
+    <label>Travel / fuel costs (£)</label>
+    <input type="number" id="travelCost" placeholder="e.g. 30">
+
+    <label>Your minimum hourly rate (£)</label>
+    <input type="number" id="targetRate" placeholder="e.g. 40">
+
+    <button onclick="calculate()">Calculate</button>
+
+    <div id="result"></div>
+
+</div>
+
+<script>
+
+function calculate() {
+
+    const price = Number(document.getElementById("price").value);
+    const hours = Number(document.getElementById("hours").value);
+    const travelTime = Number(document.getElementById("travelTime").value);
+    const materials = Number(document.getElementById("materials").value);
+    const travelCost = Number(document.getElementById("travelCost").value);
+    const targetRate = Number(document.getElementById("targetRate").value);
+
+    if (!price || !hours || !targetRate) {
+        alert("Please enter the job price, hours and your minimum hourly rate.");
+        return;
+    }
+
+    const totalTime = hours + travelTime;
+    const profit = price - materials - travelCost;
+    const hourlyRate = profit / totalTime;
+
+    const result = document.getElementById("result");
+
+    result.style.display = "block";
+
+    if (hourlyRate >= targetRate) {
+
+        result.className = "take";
+
+        result.innerHTML = `
+            <h2>🟢 TAKE IT</h2>
+            <div class="rate">£${hourlyRate.toFixed(2)}/hour</div>
+            <p>
+                This job appears to meet your target hourly rate.
+            </p>
+        `;
+
+    } else if (hourlyRate >= targetRate * 0.75) {
+
+        result.className = "negotiate";
+
+        result.innerHTML = `
+            <h2>🟠 NEGOTIATE</h2>
+            <div class="rate">£${hourlyRate.toFixed(2)}/hour</div>
+            <p>
+                You're below your target. Consider increasing the price.
+            </p>
+        `;
+
+    } else {
+
+        result.className = "walk";
+
+        result.innerHTML = `
+            <h2>🔴 WALK AWAY</h2>
+            <div class="rate">£${hourlyRate.toFixed(2)}/hour</div>
+            <p>
+                This job appears to be significantly below your target rate.
+            </p>
+        `;
+    }
+}
+
+</script>
+
+</body>
+</html>

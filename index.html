@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lawn Mower Mayhem</title>
+<style>
+  :root { color-scheme: dark; --panel: rgba(17, 35, 24, .88); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    padding: 18px; font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+    color: #f4ffe9; background: radial-gradient(ellipse at top, #244a32, #101b17 70%);
+  }
+  .game { width: min(100%, 1000px); }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  h1 { font-size: clamp(1.4rem, 3vw, 2.2rem); margin:0; letter-spacing:.02em; }
+  .stats { display:flex; gap:8px; flex-wrap:wrap; }
+  .pill { background:var(--panel); border:1px solid #52785a; border-radius:999px; padding:8px 13px; font-weight:700; }
+  .board { position:relative; border:3px solid #8cb76e; border-radius:16px; overflow:hidden; box-shadow:0 18px 55px #0008; background:#78b94e; }
+  canvas { display:block; width:100%; height:auto; touch-action:none; }
+  .overlay { position:absolute; inset:0; display:grid; place-items:center; background:#102016b8; padding:20px; text-align:center; }
+  .overlay[hidden] { display:none; }
+  .modal { max-width:440px; background:#173321; border:2px solid #8cb76e; border-radius:18px; padding:24px; box-shadow:0 12px 40px #0007; }
+  .modal h2 { margin:0 0 8px; font-size:1.8rem; }
+  .modal p { line-height:1.5; color:#d8ead0; }
+  button { cursor:pointer; border:0; border-radius:10px; padding:11px 17px; background:#d7ff82; color:#1a3218; font:700 1rem inherit; font-weight:800; }
+  button:hover { filter:brightness(1.07); transform:translateY(-1px); }
+  .help { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; color:#d9e8d7; font-size:.95rem; }
+  .keys { display:flex; gap:5px; align-items:center; }
+  kbd { background:#24392b; border:1px solid #66846b; border-radius:5px; padding:3px 7px; min-width:25px; text-align:center; box-shadow:0 2px 0 #101a13; }
+  .touch { display:none; gap:8px; align-items:center; }
+  .touch button { min-width:46px; min-height:42px; padding:8px; background:#e1f7cc; }
+  @media (pointer:coarse) { .touch { display:flex; } }
+</style>
+</head>
+<body>
+<main class="game">
+  <header>
+    <h1>🌱 Lawn Mower Mayhem</h1>
+    <div class="stats">
+      <div class="pill">Grass cut: <span id="percent">0%</span></div>
+      <div class="pill">Time: <span id="time">90</span>s</div>
+      <div class="pill">Speed: <span id="speed">1</span></div>
+    </div>
+  </header>
+  <section class="board" aria-label="Lawn mower game">
+    <canvas id="game" width="960" height="600" aria-label="Game field"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="modal">
+        <h2 id="modalTitle">Ready to mow?</h2>
+        <p id="modalText">Cut as much grass as you can before the timer runs out. Avoid the trees, flower beds, and garden gnome!</p>
+        <p><strong>Move:</strong> WASD or arrow keys<br><strong>Mobile:</strong> use the direction buttons</p>
+        <button id="startBtn">Start mowing</button>
+      </div>
+    </div>
+  </section>
+  <div class="help">
+    <div class="keys"><span>Move</span> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span>or</span> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div>
+    <div class="touch" aria-label="Touch controls">
+      <button data-dir="up" aria-label="Move up">▲</button>
+      <button data-dir="left" aria-label="Move left">◀</button>
+      <button data-dir="down" aria-label="Move down">▼</button>
+      <button data-dir="right" aria-label="Move right">▶</button>
+    </div>
+    <button id="restartBtn">Restart</button>
+  </div>
+</main>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, CELL = 12;
+  const cols = Math.floor(W / CELL), rows = Math.floor(H / CELL);
+  const grass = new Uint8Array(cols * rows);
+  const percentEl = document.getElementById('percent');
+  const timeEl = document.getElementById('time');
+  const speedEl = document.getElementById('speed');
+  const overlay = document.getElementById('overlay');
+  const titleEl = document.getElementById('modalTitle');
+  const textEl = document.getElementById('modalText');
+  const startBtn = document.getElementById('startBtn');
+
+  const obstacles = [
+    {x:130,y:105,r:27,type:'tree'}, {x:300,y:90,r:23,type:'tree'},
+    {x:520,y:145,r:28,type:'tree'}, {x:795,y:100,r:26,type:'tree'},
+    {x:180,y:360,r:31,type:'flower'}, {x:430,y:420,r:35,type:'flower'},
+    {x:690,y:330,r:28,type:'tree'}, {x:840,y:470,r:25,type:'tree'},
+    {x:325,y:250,r:15,type:'gnome'}
+  ];
+  let mower, running = false, seconds = 90, last = 0, elapsed = 0, cutCount = 0;
+  const keys = new Set();
+  const touchDirs = new Set();
+
+  function reset() {
+    grass.fill(1); cutCount = 0; seconds = 90; elapsed = 0;
+    mower = {x: W/2, y:H/2, angle:0, radius:15, trail:[]};
+    updateStats(); draw();
+  }
+  function blocked(x,y) {
+    if (x < 18 || y < 18 || x > W-18 || y > H-18) return true;
+    return obstacles.some(o => Math.hypot(x-o.x,y-o.y) < o.r + 17);
+  }
+  function cutGrass(x,y) {
+    const cx = Math.floor(x/CELL), cy = Math.floor(y/CELL);
+    for (let yy=cy-2; yy<=cy+2; yy++) for (let xx=cx-2; xx<=cx+2; xx++) {
+      if (xx<0 || yy<0 || xx>=cols || yy>=rows) continue;
+      const gx=xx*CELL+CELL/2, gy=yy*CELL+CELL/2;
+      if (Math.hypot(gx-x,gy-y)<25) {
+        const i=yy*cols+xx;
+        if (grass[i]) { grass[i]=0; cutCount++; }
+      }
+    }
+  }
+  function updateStats() {
+    percentEl.textContent = Math.round(cutCount/grass.length*100) + '%';
+    timeEl.textContent = Math.ceil(seconds);
+    speedEl.textContent = mower && mower.boost ? '2' : '1';
+  }
+  function drawGrass() {
+    for (let y=0;y<rows;y++) for (let x=0;x<cols;x++) {
+      const i=y*cols+x, px=x*CELL, py=y*CELL;
+      if (grass[i]) {
+        ctx.fillStyle = ((x*7+y*13)%5===0) ? '#78b84d' : '#83c755';
+        ctx.fillRect(px,py,CELL,CELL);
+        if ((x*11+y*3)%13===0) {
+          ctx.strokeStyle='#6eae46'; ctx.lineWidth=1;
+          ctx.beginPath(); ctx.moveTo(px+4,py+8); ctx.lineTo(px+6,py+4); ctx.stroke();
+        }
+      } else {
+        ctx.fillStyle = ((x+y)%2===0) ? '#b7d77a' : '#c0dc83';
+        ctx.fillRect(px,py,CELL,CELL);
+      }
+    }
+  }
+  function drawObstacle(o) {
+    if (o.type==='tree') {
+      ctx.fillStyle='#76502f'; ctx.fillRect(o.x-5,o.y+3,10,o.r+8);
+      ctx.fillStyle='#24613a'; ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#34814a'; ctx.beginPath(); ctx.arc(o.x-8,o.y-7,o.r*.62,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#559b4b'; ctx.beginPath(); ctx.arc(o.x+8,o.y-8,o.r*.48,0,Math.PI*2); ctx.fill();
+    } else if (o.type==='flower') {
+      ctx.fillStyle='#e3b879'; ctx.beginPath(); ctx.ellipse(o.x,o.y,o.r+5,o.r-3,0,0,Math.PI*2); ctx.fill();
+      for(let a=0;a<Math.PI*2;a+=Math.PI/4) {
+        ctx.fillStyle='#f8e7df'; ctx.beginPath(); ctx.arc(o.x+Math.cos(a)*12,o.y+Math.sin(a)*12,6,0,Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle='#f2bd36'; ctx.beginPath(); ctx.arc(o.x,o.y,7,0,Math.PI*2); ctx.fill();
+    } else {
+      ctx.fillStyle='#e5d7bd'; ctx.beginPath(); ctx.arc(o.x,o.y,10,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#d94735'; ctx.beginPath(); ctx.moveTo(o.x-8,o.y-3); ctx.lineTo(o.x,o.y-18); ctx.lineTo(o.x+8,o.y-3); ctx.fill();
+      ctx.fillStyle='#253c2b'; ctx.fillRect(o.x-6,o.y+3,12,9);
+      ctx.fillStyle='#fff'; ctx.fillRect(o.x-4,o.y-2,3,3); ctx.fillRect(o.x+2,o.y-2,3,3);
+    }
+  }
+  function drawMower() {
+    ctx.save(); ctx.translate(mower.x,mower.y); ctx.rotate(mower.angle);
+    ctx.fillStyle='#1e5d35'; ctx.fillRect(-20,-13,8,8); ctx.fillRect(12,-13,8,8); ctx.fillRect(-20,6,8,8); ctx.fillRect(12,6,8,8);
+    ctx.fillStyle='#e8493f'; ctx.beginPath(); ctx.roundRect(-15,-13,30,26,6); ctx.fill();
+    ctx.fillStyle='#ff7663'; ctx.beginPath(); ctx.roundRect(-8,-9,15,18,4); ctx.fill();
+    ctx.strokeStyle='#333e30'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(13,0); ctx.lineTo(23,0); ctx.lineTo(26,-10); ctx.stroke();
+    ctx.fillStyle='#f4e6a6'; ctx.beginPath(); ctx.arc(8,-5,2.5,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  function draw() {
+    drawGrass();
+    // Lawn border
+    ctx.strokeStyle='#f0e5a2'; ctx.lineWidth=8; ctx.strokeRect(4,4,W-8,H-8);
+    obstacles.forEach(drawObstacle);
+    if (mower) drawMower();
+  }
+  function getDirection() {
+    let dx=0,dy=0;
+    if(keys.has('arrowleft')||keys.has('a')||touchDirs.has('left')) dx--;
+    if(keys.has('arrowright')||keys.has('d')||touchDirs.has('right')) dx++;
+    if(keys.has('arrowup')||keys.has('w')||touchDirs.has('up')) dy--;
+    if(keys.has('arrowdown')||keys.has('s')||touchDirs.has('down')) dy++;
+    if(dx&&dy) {dx*=Math.SQRT1_2;dy*=Math.SQRT1_2;}
+    return {dx,dy};
+  }
+  function finish(won) {
+    running=false;
+    titleEl.textContent = won ? 'Lawn looking lovely!' : 'Time is up!';
+    textEl.textContent = `You cut ${Math.round(cutCount/grass.length*100)}% of the lawn. ${won?'Perfectly mown!':'Fancy another go and beat your score?'}`;
+    startBtn.textContent='Play again';
+    overlay.hidden=false;
+  }
+  function loop(now) {
+    if(!running) return;
+    const dt=Math.min((now-last)/1000,.04); last=now; elapsed+=dt; seconds=Math.max(0,seconds-dt);
+    const {dx,dy}=getDirection();
+    if(dx||dy) {
+      const speed=185, nx=mower.x+dx*speed*dt, ny=mower.y+dy*speed*dt;
+      if(!blocked(nx,mower.y)) mower.x=nx;
+      if(!blocked(mower.x,ny)) mower.y=ny;
+      mower.angle=Math.atan2(dy,dx);
+      cutGrass(mower.x,mower.y);
+    }
+    updateStats(); draw();
+    if(seconds<=0) {finish(false);return;}
+    if(cutCount>=grass.length*.98) {finish(true);return;}
+    requestAnimationFrame(loop);
+  }
+  function start() {
+    reset(); overlay.hidden=true; running=true; last=performance.now(); requestAnimationFrame(loop);
+  }
+  document.addEventListener('keydown', e => {
+    const k=e.key.toLowerCase();
+    if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+    keys.add(k);
+    if(!running && !overlay.hidden && k==='enter') start();
+  });
+  document.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+  window.addEventListener('blur',()=>{keys.clear();touchDirs.clear();});
+  document.querySelectorAll('[data-dir]').forEach(btn => {
+    const dir=btn.dataset.dir;
+    const down=e=>{e.preventDefault();touchDirs.add(dir);};
+    const up=e=>{e.preventDefault();touchDirs.delete(dir);};
+    btn.addEventListener('pointerdown',down); btn.addEventListener('pointerup',up);
+    btn.addEventListener('pointercancel',up); btn.addEventListener('pointerleave',up);
+  });
+  startBtn.addEventListener('click',start);
+  document.getElementById('restartBtn').addEventListener('click',start);
+  reset();
+})();
+</script>
+</body>
+</html>
